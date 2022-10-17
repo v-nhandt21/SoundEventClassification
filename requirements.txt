@@ -1,0 +1,7 @@
+tensorboard
+librosa
+tqdm
+transformers
+efficientnet_pytorch
+seaborn
+matplotlib

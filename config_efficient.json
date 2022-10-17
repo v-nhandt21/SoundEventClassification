@@ -1,6 +1,6 @@
 {
-    "input_wavs_train_file":"/home/nhandt23/Desktop/DCASE/SoundClasification/Outdir/train.txt",
-    "input_wavs_val_file":"/home/nhandt23/Desktop/DCASE/SoundClasification/Outdir/val.txt",
+    "input_wavs_train_file":"Outdir/train.txt",
+    "input_wavs_val_file":"Outdir/val.txt",
     "batch_size": 64,
     "learning_rate": 0.00005,
     "adam_b1": 0.8,

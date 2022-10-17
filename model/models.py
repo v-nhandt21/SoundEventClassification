@@ -11,10 +11,17 @@ class SoundClassifier(nn.Module):
           
           self.transform = nn.Linear(1,3)
           self.mv2 = EfficientNet.from_pretrained('efficientnet-b'+str(h.backbone), dropout_rate=0.5)
-          self.l1 = nn.Linear(1000 , 256)
-          self.dropout = nn.Dropout(0.5)
-          self.l2 = nn.Linear(256, n_classes)
-          self.relu = nn.LeakyReLU()
+          
+          self.bottleneck = nn.Sequential(
+                    nn.Dropout(0.25),
+                    nn.Linear(1000, 256),
+                    nn.ReLU(),
+                    nn.BatchNorm1d(256),
+                    nn.Dropout(0.25),
+                    nn.Linear(256, 128),
+                    nn.ReLU(),
+                    nn.BatchNorm1d(128))
+          self.classifier = nn.Linear(128, n_classes)
      
      def forward(self, x):
 
@@ -23,10 +30,10 @@ class SoundClassifier(nn.Module):
           x = x.permute(0, 3, 1, 2)
           x = self.mv2(x)
 
-          x = self.dropout(self.relu(self.l1(x)))
-          x = self.l2(x)
+          embedding = self.bottleneck(x)
+          x = self.classifier(embedding)
           x = torch.nn.functional.log_softmax(x, dim=1)
-          return x
+          return x, embedding
 
 class Wav2VecClassifier(nn.Module):
      
@@ -38,7 +45,10 @@ class Wav2VecClassifier(nn.Module):
           self.backbone.config.mask_feature_prob = 0.3
           self.backbone.config.mask_feature_min_masks = 2
 
-          self.backbone.feature_extractor._freeze_parameters()
+          if int(h.freeze_encoder) == 1:
+               self.backbone.feature_extractor._freeze_parameters()
+          else:
+               print("Do not freeze")
 
           self.bottleneck = nn.Sequential(
                     nn.Dropout(0.25),
@@ -58,12 +68,12 @@ class Wav2VecClassifier(nn.Module):
           embedding = self.bottleneck(x)
           x = self.classifier(embedding)
           x = torch.nn.functional.log_softmax(x, dim=1)
-          return x
+          return x, embedding
 
 if __name__ == '__main__':
 
      from torch.utils.data import DataLoader
-     from utils import AttrDict
+     from utils.utils import AttrDict
      import json, tqdm
      with open("config_v1.json") as f:
           data = f.read()

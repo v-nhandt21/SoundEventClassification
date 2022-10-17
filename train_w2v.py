@@ -7,16 +7,17 @@ import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 
-from utils import AttrDict, build_env
-from meldataset import MelDataset, WavDataset
-from models import SoundClassifier, Wav2VecClassifier
-from utils import scan_checkpoint, load_checkpoint, save_checkpoint
-from loss import FocalLoss, WeightedFocalLoss, AutoscaleFocalLoss, CrossEntropyWithLogits
-
+from utils.utils import AttrDict, build_env
+from dataloader.meldataset import MelDataset
+from dataloader.wavdataset import WavDataset
+from model.models import SoundClassifier, Wav2VecClassifier
+from utils.utils import scan_checkpoint, load_checkpoint, save_checkpoint
+from model.loss import FocalLoss, WeightedFocalLoss, AutoscaleFocalLoss, CrossEntropyWithLogits
+from pytorch_balanced_sampler.sampler import SamplerFactory
 
 def train(rank, a, h):
 
-     LogWanDB = a.use_wandb
+     LogWanDB = True #a.use_wandb
 
      if LogWanDB:
           import wandb
@@ -25,7 +26,7 @@ def train(rank, a, h):
      torch.cuda.manual_seed(h.seed)
      device = torch.device('cuda:{:d}'.format(rank))
 
-     criterion = FocalLoss()
+     criterion = AutoscaleFocalLoss()
 
      model = Wav2VecClassifier(h).to(device)
 
@@ -57,8 +58,17 @@ def train(rank, a, h):
 
      scheduler_g = torch.optim.lr_scheduler.ExponentialLR(optim_g, gamma=h.lr_decay, last_epoch=last_epoch)
      trainset = WavDataset(h, h.input_wavs_train_file, train=True)
-     train_loader = DataLoader(trainset, num_workers=h.num_workers, shuffle=False, sampler=None, batch_size=h.batch_size, pin_memory=True, drop_last=True)
+     class_idxs = trainset.get_class_idxs()
 
+     batch_sampler = SamplerFactory().get(
+     class_idxs=class_idxs,
+     batch_size=h.batch_size,
+     n_batches=int(len(trainset)/h.batch_size),
+     alpha=0.9,
+     kind='random'
+     )
+
+     train_loader = DataLoader(trainset, num_workers=h.num_workers, batch_sampler=batch_sampler, pin_memory=True)
      if rank == 0:
           validset = WavDataset(h, h.input_wavs_val_file, train=False)
           validation_loader = DataLoader(validset, num_workers=1, shuffle=False, sampler=None, batch_size=1, pin_memory=True, drop_last=True)
@@ -79,16 +89,18 @@ def train(rank, a, h):
                x = torch.autograd.Variable(x.to(device, non_blocking=True))
                y = torch.autograd.Variable(y.to(device, non_blocking=True))
 
-               y_hat = model(x)
+               y_hat, _ = model(x)
+
+               optim_g.zero_grad()
 
                if torch.isnan(y_hat).any():
                     print(filename)
-                    quit()
+                    # quit()
                else:
                     loss = criterion(y_hat, y)
                     if torch.isnan(loss).any():
                          print(filename)
-                         quit()
+                         # quit()
                     else:
                          loss.backward()
                          optim_g.step()
@@ -121,10 +133,10 @@ def train(rank, a, h):
                                    x = torch.autograd.Variable(x.to(device, non_blocking=True)).float()
                                    y = torch.autograd.Variable(y.to(device, non_blocking=True)).long()
 
-                                   y_hat = model(x)
+                                   y_hat, _ = model(x)
                                    val_err_tot += criterion(y_hat, y)
 
-                         val_err = val_err_tot / (j+1)
+                         val_err = val_err_tot #/ (j+1)
                          sw.add_scalar("loss/val", val_err, steps)
 
                          model.train()

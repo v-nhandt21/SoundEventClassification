@@ -1,4 +1,3 @@
-import cv2
 import torch
 import random
 import librosa
@@ -6,8 +5,6 @@ import numpy as np
 import math
 import random
 import numpy as np
-
-cv2.setNumThreads(0)
 
 def image_crop(image, bbox):
     return image[bbox[1]:bbox[3], bbox[0]:bbox[2]]
@@ -100,27 +97,6 @@ class OneOf:
             image, trg = transform(image, trg)
             return image, trg
 
-
-class Flip:
-    def __init__(self, flip_code):
-        assert flip_code == 0 or flip_code == 1
-        self.flip_code = flip_code
-
-    def __call__(self, image):
-        image = cv2.flip(image, self.flip_code)
-        return image
-
-
-class HorizontalFlip(Flip):
-    def __init__(self):
-        super().__init__(1)
-
-
-class VerticalFlip(Flip):
-    def __init__(self):
-        super().__init__(0)
-
-
 class GaussNoise:
     def __init__(self, sigma_sq):
         self.sigma_sq = sigma_sq
@@ -129,24 +105,6 @@ class GaussNoise:
         if self.sigma_sq > 0.0:
             image = gauss_noise(image, np.random.uniform(0, self.sigma_sq))
         return image
-
-
-class RandomGaussianBlur:
-    '''Apply Gaussian blur with random kernel size
-    Args:
-        max_ksize (int): maximal size of a kernel to apply, should be odd
-        sigma_x (int): Standard deviation
-    '''
-    def __init__(self, max_ksize=5, sigma_x=20):
-        assert max_ksize % 2 == 1, "max_ksize should be odd"
-        self.max_ksize = max_ksize // 2 + 1
-        self.sigma_x = sigma_x
-
-    def __call__(self, image):
-        kernel_size = tuple(2 * np.random.randint(0, self.max_ksize, 2) + 1)
-        blured_image = cv2.GaussianBlur(image, kernel_size, self.sigma_x)
-        return blured_image
-
 
 class ImageToTensor:
     def __call__(self, image):

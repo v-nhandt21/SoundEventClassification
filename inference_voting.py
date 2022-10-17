@@ -28,10 +28,10 @@ def inference(a, h, wav=False):
      model.load_state_dict(state_dict['classifier'])
 
      if wav:
-          testset = WavDataset(h, fileid='/home/noahdrisort/Desktop/DCASE/SoundEventClassification/Outdir/test.txt', train=False)
+          testset = WavDataset(h, fileid='/home/noahdrisort/Desktop/DCASE/SoundEventClassification/Outdir/test.txt', train=True)
      else:
-          testset = MelDataset(h, fileid='/home/noahdrisort/Desktop/DCASE/SoundEventClassification/Outdir/test.txt', train=False)
-     test_loader = DataLoader(testset, num_workers=h.num_workers, shuffle=False, sampler=None, batch_size=1, pin_memory=True, drop_last=True)
+          testset = MelDataset(h, fileid='/home/noahdrisort/Desktop/DCASE/SoundEventClassification/Outdir/test.txt', train=True)
+     # test_loader = DataLoader(testset, num_workers=h.num_workers, shuffle=False, sampler=None, batch_size=1, pin_memory=True, drop_last=True)
      model.eval()
 
      Y_pred = []
@@ -40,29 +40,41 @@ def inference(a, h, wav=False):
      f_meta = open(a.checkpoint_path + "/meta.tsv", "w+", encoding="utf-8")
      f_embedding = open(a.checkpoint_path + "/embedding.tsv", "w+", encoding="utf-8")
 
-     for batch in tqdm.tqdm(test_loader):
+     voting_times = 3
+     for idx in tqdm.tqdm(range(len(testset))):
 
-          x, y, filename = batch
-          x = torch.autograd.Variable(x.to(device, non_blocking=True))
-          y_hat, emb = model(x)
+          y_hat_ave = None
 
-          pred = torch.argmax(y_hat, -1).item()
-          target = torch.argmax(y, -1).item()
+          for vote in range(voting_times):
 
-          y_hat = torch.nn.Softmax(dim=1)(y_hat)
+               x, y, filename = testset.__getitem__(idx)
+               x = x.unsqueeze(0)
+               y = y.unsqueeze(0)
+               
+               x = torch.autograd.Variable(x.to(device, non_blocking=True))
+               y_hat, emb = model(x)
+
+               pred = torch.argmax(y_hat, -1).item()
+               target = torch.argmax(y, -1).item()
+
+               y_hat = torch.nn.Softmax(dim=1)(y_hat)
+               
+               f_meta.write(str(target) + "\n")
+               emb = emb[0]
+               f_embedding.write("\t".join([str(s) for s in emb.tolist()]) + "\n")
+
+               if y_hat_ave == None:
+                    y_hat_ave = y_hat
+               else:
+                    y_hat_ave += y_hat
           
-          f_meta.write(str(target) + "\n")
-          emb = emb[0]
-          f_embedding.write("\t".join([str(s) for s in emb.tolist()]) + "\n")
+          y_hat_ave /= 3
 
-          Y_pred.append(y_hat.cpu().detach().numpy())
+          Y_pred.append(y_hat_ave.cpu().detach().numpy())
           Y_target.append(y.cpu().detach().numpy())
 
      Y_pred = np.concatenate(Y_pred, axis=0 )
      Y_target = np.concatenate( Y_target, axis=0 )
-
-     print(Y_pred.shape)
-     print(Y_target.shape)
 
      classes = {'Motor vehicle (road)': 0, 'Screaming': 1, 'Explosion': 2, 'Female speech': 3, 'Male speech': 4, 'Breaking': 5, 'Crowd': 6, 'Crying, sobbing': 7, 'Siren': 8, 'Gunshot, gunfire': 9}
      plt1 = plot_precision_recall_curve(Y_target, Y_pred, list(classes.keys()), "Outdir/test_prc.png")

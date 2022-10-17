@@ -1,0 +1,6 @@
+Outdir/*
+Dataset/train_labels/*
+Dataset/val_labels/*
+Dataset/test_labels/*
+TMPMeldir/*
+wandb/*

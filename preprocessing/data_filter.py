@@ -1,11 +1,11 @@
 import glob, torch
-import torchaudio
+import torchaudio, os
 
-train = glob.glob("/home/nhandt23/Desktop/DCASE/Dataset/train_labels/*.wav")
+train = glob.glob("Dataset/train_labels/*.wav")
 
-val = glob.glob("/home/nhandt23/Desktop/DCASE/Dataset/val_labels/*.wav")
+val = glob.glob("Dataset/val_labels/*.wav")
 
-test = glob.glob("/home/nhandt23/Desktop/DCASE/Dataset/test_labels/*.wav")
+test = glob.glob("Dataset/test_labels/*.wav")
 
 print(len(train))
 print(len(val))
@@ -13,6 +13,7 @@ print(len(test))
 # 72354
 # 15494
 # 15530
+os.makedirs("Outdir", exist_ok=True)
 
 f_train = open("Outdir/train.txt", "w+", encoding="utf-8")
 f_val = open("Outdir/val.txt", "w+", encoding="utf-8")
@@ -20,11 +21,11 @@ f_test = open("Outdir/test.txt", "w+", encoding="utf-8")
 
 segment = 65536
 
-segment = 65536 + 16000
+segment = 16000 #65536 + 16000
 
 print(segment)
 
-# /home/nhandt23/Desktop/DCASE/Dataset/train_labels/others_ogg3200-15007.wav
+# Dataset/train_labels/others_ogg3200-15007.wav
 def check(filename):
      label_dict = {'Motor vehicle (road)': 0, 'Female speech': 3, 'Male speech': 4, 'Breaking': 5, 'Crowd': 6, 'Crying, sobbing': 7, 'Siren': 8, 'Gunshot, gunfire': 9, 'Screaming': 1, 'Explosion': 2}
      
