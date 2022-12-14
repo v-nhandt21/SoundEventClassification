@@ -16,12 +16,10 @@ from dataloader.augment import get_transforms
 
 MAX_WAV_VALUE = 32768.0
 
-class MelDataset(torch.utils.data.Dataset):
-    def __init__(self, h, fileid, train=True):
+class MelTripletDataset(torch.utils.data.Dataset):
+    def __init__(self, h, audio_files, train=True):
 
-        f = open(fileid, "r", encoding="utf-8")
-        self.audio_files = f.read().splitlines()
-        f.close()
+        self.audio_files = audio_files 
         
         random.seed(1234)
         random.shuffle(self.audio_files)
@@ -59,10 +57,10 @@ class MelDataset(torch.utils.data.Dataset):
         else:
             self.transform = get_transforms(spec_prob=0)
 
-    def __getitem__(self, index):
+    def get_label(self, filename):
+          return filename.split("/")[-1].split("-")[0]#.split("_")[0]
 
-        filename = self.audio_files[index]
-        # print(filename)
+    def get_data(self, filename):
         _, audio= wf.read(filename)
 
 
@@ -115,6 +113,29 @@ class MelDataset(torch.utils.data.Dataset):
 
         return (mel.squeeze(), label, filename )
 
+    def __getitem__(self, index):
+
+        filename = self.audio_files[index]
+
+        anchor_label = self.get_label(filename)
+
+        filename_pos = self.audio_files[random.randrange(len(self.audio_files))]
+        while anchor_label != self.get_label(filename_pos):
+          filename_pos = self.audio_files[random.randrange(len(self.audio_files))]
+     
+        filename_neg = self.audio_files[random.randrange(len(self.audio_files))]
+        while anchor_label == self.get_label(filename_neg):
+          filename_neg= self.audio_files[random.randrange(len(self.audio_files))]
+        # print(filename)
+        mel_anchor, label, filename = self.get_data(filename)
+
+        mel_pos, _, _ = self.get_data(filename_pos)
+
+        mel_neg, _, _ = self.get_data(filename_neg)
+
+        return mel_anchor, mel_pos, mel_neg, label, filename
+        
+
     def get_class_idxs(self):
         class_idxs = {}
         for idx in range(len(self.audio_files)):
@@ -134,23 +155,23 @@ class MelDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.audio_files)
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
     
-    with open("/home/nhandt23/Desktop/DCASE/SoundClasification/Outdir/Eff_ex4/config_ex4.json") as f:
-        data = f.read()
-    json_config = json.loads(data)
-    h = AttrDict(json_config)
+#     with open("/home/nhandt23/Desktop/DCASE/SoundClasification/Outdir/Eff_ex4/config_ex4.json") as f:
+#         data = f.read()
+#     json_config = json.loads(data)
+#     h = AttrDict(json_config)
 
-    #############################
-    testset = MelDataset(h, fileid='/home/nhandt23/Desktop/DCASE/SoundClasification/Outdir/train.txt', train=False)
-    test_loader = DataLoader(testset, num_workers=h.num_workers, shuffle=False, sampler=None, batch_size=1, pin_memory=True, drop_last=True)
-    for i, batch in tqdm.tqdm(enumerate(test_loader)):
-        x, y, filename = batch
+#     #############################
+#     testset = MelDataset(h, fileid='/home/nhandt23/Desktop/DCASE/SoundClasification/Outdir/train.txt', train=False)
+#     test_loader = DataLoader(testset, num_workers=h.num_workers, shuffle=False, sampler=None, batch_size=1, pin_memory=True, drop_last=True)
+#     for i, batch in tqdm.tqdm(enumerate(test_loader)):
+#         x, y, filename = batch
 
         
-        x = torch.autograd.Variable(x.to("cuda", non_blocking=True))
+#         x = torch.autograd.Variable(x.to("cuda", non_blocking=True))
         
-        print(x.size())
-        if torch.isnan(x).any():
-            print(filename)
+#         print(x.size())
+#         if torch.isnan(x).any():
+#             print(filename)
     
