@@ -12,10 +12,20 @@ from dataloader.meldataset import MelDataset
 from dataloader.wavdataset import WavDataset
 from model.models import SoundClassifier
 from utils.utils import scan_checkpoint, load_checkpoint, save_checkpoint
-from model.loss import FocalLoss, WeightedFocalLoss, AutoscaleFocalLoss, CrossEntropyWithLogits
+from model.loss import FocalLoss, AutoscaleFocalLoss, CrossEntropyWithLogits, LabelSmoothingLoss
 from pytorch_balanced_sampler.sampler import SamplerFactory
+from inference import inference
+from ILI import plainILI
+
+def get_ili_label(filenames, y, LABELS):
+     for idx, file in enumerate(filenames):
+          if file in LABELS:
+               y[idx] = torch.nn.functional.one_hot( torch.tensor(LABELS[file]), num_classes=10)
+     return y
 
 def train(rank, a, h):
+
+     LABELS = {}
 
      LogWanDB = True #a.use_wandb
 
@@ -26,10 +36,15 @@ def train(rank, a, h):
      torch.cuda.manual_seed(h.seed)
      device = torch.device('cuda:{:d}'.format(rank))
 
-     if h.loss == "FocalLoss":
-          criterion = FocalLoss()
-     if h.loss == "AutoscaleFocalLoss":
-          criterion = AutoscaleFocalLoss()
+     criterion = []
+     if "FocalLoss" in h.loss:
+          criterion.append(FocalLoss())
+     if "AutoscaleFocalLoss" in h.loss:
+          criterion.append(AutoscaleFocalLoss())
+     if "LabelSmoothingLoss" in h.loss:
+          criterion.append(LabelSmoothingLoss())
+
+     print("Number of loss: ", len(criterion))
 
      model = SoundClassifier(h).to(device)
 
@@ -63,12 +78,17 @@ def train(rank, a, h):
      trainset = MelDataset(h, h.input_wavs_train_file, train=True)
 
      class_idxs = trainset.get_class_idxs()
+     
+     if hasattr(h, 'balance_alpha'):
+          balance_alpha = h.balance_alpha
+     else:
+          balance_alpha = 0.8
 
      batch_sampler = SamplerFactory().get(
      class_idxs=class_idxs,
      batch_size=h.batch_size,
      n_batches=int(len(trainset)/h.batch_size),
-     alpha=0.8,
+     alpha=balance_alpha,
      kind='random'
      )
 
@@ -91,6 +111,9 @@ def train(rank, a, h):
                     start_b = time.time()
           
                x, y, filename = batch
+
+               y = get_ili_label(filename, y, LABELS)
+               
                x = torch.autograd.Variable(x.to(device, non_blocking=True))
                y = torch.autograd.Variable(y.to(device, non_blocking=True))
 
@@ -102,7 +125,13 @@ def train(rank, a, h):
                     print(filename)
                     # quit()
                else:
-                    loss = criterion(y_hat, y)
+                    loss = None
+                    for l in criterion:
+                         if loss == None:
+                              loss = l(y_hat, y)
+                         else:
+                              loss += l(y_hat, y)
+
                     if torch.isnan(loss).any():
                          print(filename)
                          # quit()
@@ -122,6 +151,11 @@ def train(rank, a, h):
                                         {'classifier': model.state_dict(),
                                         'optim_g': optim_g.state_dict(), 'optim_d': optim_g.state_dict(), 'steps': steps,
                                         'epoch': epoch})
+                         model.eval()
+                         torch.cuda.empty_cache()
+                         inference(a.checkpoint_path, h)
+                         LABELS = plainILI(a.checkpoint_path, h)
+                         model.train()
                     # Tensorboard summary logging
                     if steps % a.summary_interval == 0:
                          sw.add_scalar("loss/train", loss, steps)
@@ -131,6 +165,7 @@ def train(rank, a, h):
                     if steps % a.validation_interval == 0:  # and steps != 0:
                          model.eval()
                          torch.cuda.empty_cache()
+
                          val_err_tot = 0
                          with torch.no_grad():
                               for j, batch in enumerate(validation_loader):
@@ -139,12 +174,21 @@ def train(rank, a, h):
                                    y = torch.autograd.Variable(y.to(device, non_blocking=True)).long()
 
                                    y_hat, _ = model(x)
-                                   val_err_tot += criterion(y_hat, y)
+
+                                   loss = None
+                                   for l in criterion:
+                                        if loss == None:
+                                             loss = l(y_hat, y)
+                                        else:
+                                             loss += l(y_hat, y)
+                                   val_err_tot += loss
 
                          val_err = val_err_tot / (j+1)
                          sw.add_scalar("loss/val", val_err, steps)
 
                          model.train()
+
+                    
 
                steps += 1
 
@@ -165,7 +209,7 @@ if __name__ == '__main__':
      parser.add_argument('--stdout_interval', default=5, type=int)
      parser.add_argument('--checkpoint_interval', default=500, type=int)
      parser.add_argument('--summary_interval', default=10, type=int)
-     parser.add_argument('--validation_interval', default=100, type=int)
+     parser.add_argument('--validation_interval', default=1500, type=int)
      parser.add_argument('--use_wandb', default=False, type=bool)
 
      a = parser.parse_args()
