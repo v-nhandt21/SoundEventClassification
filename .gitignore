@@ -4,3 +4,7 @@ Dataset/val_labels/*
 Dataset/test_labels/*
 TMPMeldir/*
 wandb/*
+
+SpeakerEncoder/train_emb/*
+SpeakerEncoder/test_emb/*
+wandb/*
