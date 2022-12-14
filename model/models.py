@@ -23,7 +23,7 @@ class SoundClassifier(nn.Module):
                     nn.BatchNorm1d(128))
           self.classifier = nn.Linear(128, n_classes)
      
-     def forward(self, x):
+     def forward(self, x, train=True):
 
           x = x.unsqueeze(-1)
           x = self.transform(x)
@@ -32,9 +32,45 @@ class SoundClassifier(nn.Module):
 
           embedding = self.bottleneck(x)
           x = self.classifier(embedding)
-          x = torch.nn.functional.log_softmax(x, dim=1)
+          if train:
+               x = torch.nn.functional.log_softmax(x, dim=1)
+          else:
+               x = torch.nn.functional.sigmoid(x)
           return x, embedding
 
+class CRNN(nn.Module):
+     
+     def __init__(self, h, n_classes=10):     
+          super().__init__()  
+          self.h = h
+          
+          self.transform = nn.Linear(1,3)
+          self.cnn = EfficientNet.from_pretrained('efficientnet-b'+str(h.backbone), dropout_rate=0.5)
+          
+          self.bottleneck = nn.Sequential(
+                    nn.Dropout(0.25),
+                    nn.Linear(1000, 256),
+                    nn.ReLU(),
+                    nn.BatchNorm1d(256),
+                    nn.Dropout(0.25),
+                    nn.Linear(256, 128),
+                    nn.ReLU(),
+                    nn.BatchNorm1d(128))
+          self.classifier = nn.Linear(128, n_classes)
+     
+     def forward(self, x):
+
+          x = x.unsqueeze(-1)
+          x = self.transform(x)
+          x = x.permute(0, 3, 1, 2)
+          x = self.cnn(x)
+
+          print(x.size())
+
+          embedding = self.bottleneck(x)
+          x = self.classifier(embedding)
+          x = torch.nn.functional.log_softmax(x, dim=1)
+          return x, embedding
 class Wav2VecClassifier(nn.Module):
      
      def __init__(self, h, n_classes=10):     
@@ -70,19 +106,29 @@ class Wav2VecClassifier(nn.Module):
           x = torch.nn.functional.log_softmax(x, dim=1)
           return x, embedding
 
+class AttrDict(dict):
+     def __init__(self, *args, **kwargs):
+          super(AttrDict, self).__init__(*args, **kwargs)
+          self.__dict__ = self
+
 if __name__ == '__main__':
 
-     from torch.utils.data import DataLoader
-     from utils.utils import AttrDict
      import json, tqdm
-     with open("config_v1.json") as f:
+     with open("config_efficient.json") as f:
           data = f.read()
      json_config = json.loads(data)
      h = AttrDict(json_config)
 
      ######################
 
-     model = Wav2VecClassifier().to("cuda")
-     x = torch.randn(3, 48000).to("cuda")
+     model = CRNN(h).to("cuda")
+     x = torch.randn(8, 32, 80).to("cuda")
      outs = model(x)
      print(outs.size())
+
+     ######################
+
+     # model = Wav2VecClassifier().to("cuda")
+     # x = torch.randn(3, 48000).to("cuda")
+     # outs = model(x)
+     # print(outs.size())
