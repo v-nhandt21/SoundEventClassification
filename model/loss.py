@@ -28,6 +28,28 @@ class AutoscaleFocalLoss:
           loss = torch.sum(loss, dim=-1).mean()
           return loss
 
+class LabelSmoothingLoss(torch.nn.Module):
+     def __init__(self, smoothing=0.5):
+
+          super(LabelSmoothingLoss, self).__init__()
+          self.confidence = 1.0 - smoothing
+          self.smoothing = smoothing
+
+     def forward(self, x, target):
+          target = torch.argmax(target, -1)
+          logprobs = torch.nn.functional.log_softmax(x, dim=-1)
+          nll_loss = -logprobs.gather(dim=-1, index=target.unsqueeze(1))
+          nll_loss = nll_loss.squeeze(1)
+          smooth_loss = -logprobs.mean(dim=-1)
+          loss = self.confidence * nll_loss + self.smoothing * smooth_loss
+          return loss.mean()
+          
+     # def __init__(self, smoothing=0.5):
+     #      self.smoothing = smoothing
+     #      self.loss = nn.CrossEntropyLoss( label_smoothing= self.smoothing)
+
+     # def __call__(self, logits, labels):
+     #      return self.loss(logits, labels)
 class FocalLoss:
      def __init__(self, gamma=2.0):
           self.gamma = 2.0
@@ -64,25 +86,10 @@ class BinaryCrossEntropyWithLogits:
           pass
      def __call__(self, logits, labels):
           return F.binary_cross_entropy_with_logits(logits, labels)
-          
-class WeightedFocalLoss(nn.Module):
-     "Non weighted version of Focal Loss"
-     def __init__(self, alpha=.25, gamma=2):
-          super(WeightedFocalLoss, self).__init__()
-          self.alpha = torch.tensor([alpha, 1-alpha]).cuda()
-          self.gamma = gamma
 
-     def forward(self, inputs, targets):
-          BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction='none')
-          y = torch.ones(targets.shape).cuda()
-          targets = torch.where(targets == 0, targets, y)
-          
-          targets = targets.type(torch.long)
-          
-          at = self.alpha.gather(0, targets.data.view(-1))
-          pt = torch.exp(-BCE_loss)
-
-          at = at.view(-1, 56)
-          
-          F_loss = at*(1-pt)**self.gamma * BCE_loss
-          return F_loss
+if __name__ == '__main__':
+     # loss = WeightedFocalLoss().to("cuda")
+     loss = FocalLoss()
+     a = torch.Tensor(50,10).to("cuda")
+     b = torch.Tensor(50,10).to("cuda")
+     print(loss(a, b))
