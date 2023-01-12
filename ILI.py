@@ -49,7 +49,7 @@ def plainILI(checkpoint_path, h, wav=False):
 
      return LABELS
 
-def plainILI2(checkpoint_path, h, wav=False, LABELS={}, train_loader_query=None):
+def plainILI2(checkpoint_path, h, LABELS={}, train_loader_query=None, wav=False):
      
      print("Lable before update: ", len(LABELS))
      

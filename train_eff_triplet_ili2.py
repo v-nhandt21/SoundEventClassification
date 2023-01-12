@@ -94,8 +94,8 @@ def train(rank, a, h):
                f = open(h.input_wavs_train_file, "r", encoding="utf-8")
                audio_files  = f.read().splitlines()
                f.close()
-               trainset_support = MelTripletDataset(h, audio_files[:len(audio_files)/2], train=True)
-               trainset_query = MelTripletDataset(h, audio_files[len(audio_files)/2:], train=True)
+               trainset_support = MelTripletDataset(h, audio_files[:int(len(audio_files)/2)], train=True)
+               trainset_query = MelTripletDataset(h, audio_files[int(len(audio_files)/2):], train=True)
                #############################
                class_idxs = trainset_support.get_class_idxs()
                if hasattr(h, 'balance_alpha'):
