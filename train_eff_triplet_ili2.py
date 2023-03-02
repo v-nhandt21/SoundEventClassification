@@ -17,9 +17,7 @@ from pytorch_balanced_sampler.sampler import SamplerFactory
 from inference import inference
 from ILI import plainILI, plainILI2
 
-ILI = True
-
-def get_ili_label(filenames, y, LABELS):
+def get_ili_label(filenames, y, LABELS, ILI=True):
      if not ILI:
           return y
      for idx, file in enumerate(filenames):
@@ -28,6 +26,11 @@ def get_ili_label(filenames, y, LABELS):
      return y
 
 def train(rank, a, h):
+
+     ILI = True	
+     if hasattr(h, 'ILI'):	
+          print("Set ILI to ", h.ILI)	
+          ILI = h.ILI
 
      LABELS = {}
 

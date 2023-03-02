@@ -17,9 +17,9 @@ from pytorch_balanced_sampler.sampler import SamplerFactory
 from inference import inference
 from ILI import plainILI
 
-ILI = True
 
-def get_ili_label(filenames, y, LABELS):
+
+def get_ili_label(filenames, y, LABELS, ILI=True):
      if not ILI:
           return y
      for idx, file in enumerate(filenames):
@@ -28,6 +28,11 @@ def get_ili_label(filenames, y, LABELS):
      return y
 
 def train(rank, a, h):
+
+     ILI = True
+     if hasattr(h, 'ILI'):
+          print("Set ILI to ", h.ILI)
+          ILI = h.ILI
 
      LABELS = {}
 
@@ -115,6 +120,8 @@ def train(rank, a, h):
           if ILI:
                trainset = MelTripletDataset(h, h.input_wavs_train_file, train=True)
                train_loader = DataLoader(trainset, num_workers=h.num_workers, batch_sampler=batch_sampler, pin_memory=True)
+          
+          optim_g.zero_grad()
 
           for i, batch in enumerate(train_loader):
                if rank == 0:
@@ -138,7 +145,7 @@ def train(rank, a, h):
                loss_neg = torch.nn.functional.cosine_similarity(emb_anchor, emb_neg)
                loss = torch.relu(loss_pos - loss_neg + 1)
 
-               optim_g.zero_grad()
+               
 
                if torch.isnan(y_hat).any():
                     print(filename)
@@ -155,8 +162,13 @@ def train(rank, a, h):
                          print(filename)
                          # quit()
                     else:
+
                          loss.backward()
-                         optim_g.step()
+
+                         if (i+1) % h.acc_steps == 0:
+
+                              optim_g.step()
+                              optim_g.zero_grad()
 
                if rank == 0:
                     # STDOUT logging
