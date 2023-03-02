@@ -28,9 +28,9 @@ def inference(checkpoint_path, h, wav=False):
      model.load_state_dict(state_dict['classifier'])
 
      if wav:
-          testset = WavDataset(h, fileid='/home/noahdrisort/Desktop/DCASE/SoundEventClassification/Outdir/EfficientNet/ex13/test.txt', train=False)
+          testset = WavDataset(h, fileid='/home/noahdrisort/Desktop/DCASE/SoundEventClassification/Dataset/19jan_sre_22/test.txt', train=False)
      else:
-          testset = MelDataset(h, fileid='/home/noahdrisort/Desktop/DCASE/SoundEventClassification/Outdir/EfficientNet/ex13/test.txt', train=False)
+          testset = MelDataset(h, fileid='/home/noahdrisort/Desktop/DCASE/SoundEventClassification/Dataset/script/test.txt', train=False)
      test_loader = DataLoader(testset, num_workers=h.num_workers, shuffle=False, sampler=None, batch_size=1, pin_memory=True, drop_last=True)
      model.eval()
 
@@ -39,6 +39,8 @@ def inference(checkpoint_path, h, wav=False):
 
      f_meta = open(checkpoint_path + "/meta.tsv", "w+", encoding="utf-8")
      f_embedding = open(checkpoint_path + "/embedding.tsv", "w+", encoding="utf-8")
+
+     fail = 0
 
      for batch in tqdm.tqdm(test_loader):
 
@@ -58,13 +60,34 @@ def inference(checkpoint_path, h, wav=False):
           Y_pred.append(y_hat.cpu().detach().numpy())
           Y_target.append(y.cpu().detach().numpy())
 
+          if pred != target :# and target == 5:
+               fail+=1
+               # print(filename[0])
+               fi = str(filename[0])
+               os.system("scp " + fi +" /home/noahdrisort/Desktop/DCASE/SoundEventClassification/Outdir/False_Sample")
+
+     
+     print(fail)
+
+          # print(y_hat.cpu().detach().numpy().shape)
+          # print(y.cpu().detach().numpy().shape)
+
      Y_pred = np.concatenate(Y_pred, axis=0 )
      Y_target = np.concatenate( Y_target, axis=0 )
 
      print(Y_pred.shape)
      print(Y_target.shape)
 
-     classes = {'Motor_vehicle_(road)': 0, 'Screaming': 1, 'Explosion': 2, 'Female_speech': 3, 'Male_speech': 4, 'Breaking': 5, 'Crowd': 6, 'Crying_sobbing': 7, 'Siren': 8, 'Gunshot_gunfire': 9}
+     classes = {'breaking': 0, \
+               'crowd_scream': 1, \
+               'crying_sobbing': 2, \
+               'explosion': 3, \
+               'gunshot_gunfire': 4, \
+               'motor_vehicle_road': 5, \
+               'siren': 6, \
+               'speech': 7, \
+               'silence': 8}
+     # {'Motor_vehicle_(road)': 0, 'Screaming': 1, 'Explosion': 2, 'Female_speech': 3, 'Male_speech': 4, 'Breaking': 5, 'Crowd': 6, 'Crying_sobbing': 7, 'Siren': 8, 'Gunshot_gunfire': 9}
      plt1 = plot_precision_recall_curve(Y_target, Y_pred, list(classes.keys()), "Outdir/test_prc.png")
      plt2 = plot_roc_curve(Y_target, Y_pred, list(classes.keys()), "Outdir/test_roc.png")
 
