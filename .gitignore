@@ -1,10 +1,10 @@
 Outdir/*
-Dataset/train_labels/*
-Dataset/val_labels/*
-Dataset/test_labels/*
+Dataset/*
 TMPMeldir/*
 wandb/*
 
 SpeakerEncoder/train_emb/*
 SpeakerEncoder/test_emb/*
 wandb/*
+Dataset/15nov/*
+__pycache__/

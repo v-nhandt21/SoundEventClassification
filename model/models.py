@@ -5,7 +5,7 @@ import torch.nn as nn
 
 class SoundClassifier(nn.Module):
      
-     def __init__(self, h, n_classes=10):     
+     def __init__(self, h, n_classes=9):     
           super().__init__()  
           self.h = h
           
