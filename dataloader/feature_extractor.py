@@ -267,5 +267,5 @@ def get_mel_from_wav(audio,fi, mel_dir, h, stft_obj, preprocess=False):
 
      mel, audio_norm = stft_obj.stft(audio)
      
-     np.save(file_save, mel)
-     return file_save
+     # np.save(file_save, mel)
+     return file_save, mel

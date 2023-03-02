@@ -64,7 +64,7 @@ def report(y_true, y_pred, labels, save_file):
     y_true = np.argmax(y_true, axis=1)
 
     print(labels)
-    labels = [0,1, 2, 3,4,5,6,7,8,9]
+    labels = [0,1, 2, 3,4,5,6,7,8]
 
     print(classification_report(y_true, y_pred, labels=labels))
 

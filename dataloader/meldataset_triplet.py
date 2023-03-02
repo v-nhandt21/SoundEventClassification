@@ -10,7 +10,7 @@ from pathlib import Path
 from torch.utils.data import DataLoader
 from utils.utils import AttrDict
 import json, tqdm
-
+from aug import get_augment_wav
 from dataloader.feature_extractor import get_mel, STFT, get_mel_from_wav
 from dataloader.augment import get_transforms
 
@@ -28,16 +28,26 @@ class MelTripletDataset(torch.utils.data.Dataset):
         self.h = h
         self.TMPMeldir = "TMPMeldir"
         
-        self.label_dict = { 'Motor_vehicle_(road)': 0, \
-                            'Screaming': 1, \
-                            'Explosion': 2, \
-                            'Female_speech': 3, \
-                            'Male_speech': 4, \
-                            'Breaking': 5, \
-                            'Crowd': 6, \
-                            'Crying_sobbing': 7, \
-                            'Siren': 8, \
-                            'Gunshot_gunfire': 9}
+        self.label_dict = {'breaking': 0, \
+               'crowd_scream': 1, \
+               'crying_sobbing': 2, \
+               'explosion': 3, \
+               'gunshot_gunfire': 4, \
+               'motor_vehicle_road': 5, \
+               'siren': 6, \
+               'speech': 7, \
+               'silence': 8}
+               #{'Breaking': 0, 'CrowdOrScream': 1, 'Crying,_sobbing': 2, 'Explosion': 3, 'Gunshot,_gunfire': 4, 'Motor_vehicle_(road)': 5, 'Siren': 6}
+                            # { 'Motor_vehicle_(road)': 0, \
+                            # 'Screaming': 1, \
+                            # 'Explosion': 2, \
+                            # 'Female_speech': 3, \
+                            # 'Male_speech': 4, \
+                            # 'Breaking': 5, \
+                            # 'Crowd': 6, \
+                            # 'Crying_sobbing': 7, \
+                            # 'Siren': 8, \
+                            # 'Gunshot_gunfire': 9}
         
         self.stft_obj = STFT(filter_length=h.n_fft, \
                 hop_length=h.hop_size, win_length=h.win_size, \
@@ -63,6 +73,8 @@ class MelTripletDataset(torch.utils.data.Dataset):
     def get_data(self, filename):
         _, audio= wf.read(filename)
 
+        audio = get_augment_wav(torch.from_numpy(audio).unsqueeze(0))
+
 
         audio = audio[:int(len(audio)/self.h.hop_size)*self.h.hop_size]
 
@@ -80,13 +92,19 @@ class MelTripletDataset(torch.utils.data.Dataset):
         
         wav = audio[wav_start:wav_start + self.h.segment_size]
         
-        file_mel = self.TMPMeldir + "/" + os.path.splitext( os.path.split(filename)[-1])[0] + '.npy'
-        if Path(file_mel).is_file() == False:
-            os.makedirs(self.TMPMeldir, exist_ok = True)
-            file_mel = get_mel_from_wav(wav, filename, self.TMPMeldir, self.h, self.stft_obj)
-        
-        mel = np.load(file_mel)
-        mel = torch.from_numpy(mel)
+
+        augment_audio = False
+        if not augment_audio: # Should not use, can not capture full audio
+            file_mel = self.TMPMeldir + "/" + os.path.splitext( os.path.split(filename)[-1])[0] + '.npy'
+            if Path(file_mel).is_file() == False:
+                os.makedirs(self.TMPMeldir, exist_ok = True)
+                file_mel, mel = get_mel_from_wav(wav, filename, self.TMPMeldir, self.h, self.stft_obj)
+                np.save(file_mel, mel)
+            
+            mel = np.load(file_mel)
+            mel = torch.from_numpy(mel)
+        else:
+            file_mel, mel = get_mel_from_wav(wav, filename, self.TMPMeldir, self.h, self.stft_obj)
         
         if len(mel.size()) == 2:
             mel = mel.unsqueeze(0)
@@ -106,7 +124,7 @@ class MelTripletDataset(torch.utils.data.Dataset):
             quit()
             self.label_dict[label] = len(self.label_dict)
 
-        label = torch.nn.functional.one_hot( torch.tensor(self.label_dict[label]), num_classes=10)
+        label = torch.nn.functional.one_hot( torch.tensor(self.label_dict[label]), num_classes=9)
 
         if self.train:
             mel = self.transform(mel.squeeze())

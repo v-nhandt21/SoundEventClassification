@@ -30,16 +30,26 @@ class MelDataset(torch.utils.data.Dataset):
         self.h = h
         self.TMPMeldir = "TMPMeldir"
         
-        self.label_dict = { 'Motor_vehicle_(road)': 0, \
-                            'Screaming': 1, \
-                            'Explosion': 2, \
-                            'Female_speech': 3, \
-                            'Male_speech': 4, \
-                            'Breaking': 5, \
-                            'Crowd': 6, \
-                            'Crying_sobbing': 7, \
-                            'Siren': 8, \
-                            'Gunshot_gunfire': 9}
+        self.label_dict = {'breaking': 0, \
+               'crowd_scream': 1, \
+               'crying_sobbing': 2, \
+               'explosion': 3, \
+               'gunshot_gunfire': 4, \
+               'motor_vehicle_road': 5, \
+               'siren': 6, \
+               'speech': 7, \
+               'silence': 8}
+               #{'Breaking': 0, 'CrowdOrScream': 1, 'Crying,_sobbing': 2, 'Explosion': 3, 'Gunshot,_gunfire': 4, 'Motor_vehicle_(road)': 5, 'Siren': 6}
+                            # { 'Motor_vehicle_(road)': 0, \
+                            # 'Screaming': 1, \
+                            # 'Explosion': 2, \
+                            # 'Female_speech': 3, \
+                            # 'Male_speech': 4, \
+                            # 'Breaking': 5, \
+                            # 'Crowd': 6, \
+                            # 'Crying_sobbing': 7, \
+                            # 'Siren': 8, \
+                            # 'Gunshot_gunfire': 9}
         
         self.stft_obj = STFT(filter_length=h.n_fft, \
                 hop_length=h.hop_size, win_length=h.win_size, \
@@ -74,6 +84,8 @@ class MelDataset(torch.utils.data.Dataset):
             offset = padding // 2
             pad_width = (offset, padding - offset)
             audio = np.pad(audio, pad_width, 'constant', constant_values=audio.min())
+
+            
             # signal = np.pad(signal, pad_width, 'wrap')
         if len(audio) == self.h.segment_size:
             wav_start = 0
@@ -85,10 +97,13 @@ class MelDataset(torch.utils.data.Dataset):
         file_mel = self.TMPMeldir + "/" + os.path.splitext( os.path.split(filename)[-1])[0] + '.npy'
         if Path(file_mel).is_file() == False:
             os.makedirs(self.TMPMeldir, exist_ok = True)
-            file_mel = get_mel_from_wav(wav, filename, self.TMPMeldir, self.h, self.stft_obj)
+            file_mel, mel = get_mel_from_wav(wav, filename, self.TMPMeldir, self.h, self.stft_obj)
+            np.save(file_mel, mel)
         
         mel = np.load(file_mel)
         mel = torch.from_numpy(mel)
+
+        # print("==============> ", mel.size())
         
         if len(mel.size()) == 2:
             mel = mel.unsqueeze(0)
@@ -108,7 +123,7 @@ class MelDataset(torch.utils.data.Dataset):
             quit()
             self.label_dict[label] = len(self.label_dict)
 
-        label = torch.nn.functional.one_hot( torch.tensor(self.label_dict[label]), num_classes=10)
+        label = torch.nn.functional.one_hot( torch.tensor(self.label_dict[label]), num_classes=9)
 
         if self.train:
             mel = self.transform(mel.squeeze())
